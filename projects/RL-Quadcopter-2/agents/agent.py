@@ -38,8 +38,9 @@ class DDPG():
 
         # Algorithm parameters
         self.gamma = 0.99  # discount factor
-        self.tau = 0.01  # for soft update of target parameters
+        self.tau = 0.001  # for soft update of target parameters
         self.score = -np.inf
+        self.best_score = -np.inf
 
     def reset_episode(self):
         self.noise.reset()
@@ -81,6 +82,8 @@ class DDPG():
         
         # compute average score
         self.score = np.mean(rewards)
+        if self.score > self.best_score:
+            self.best_score = self.score
         
         # Compute Q targets for current states and train critic model (local)
         Q_targets = rewards + self.gamma * Q_targets_next * (1 - dones)
