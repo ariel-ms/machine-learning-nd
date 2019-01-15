@@ -37,9 +37,9 @@ class DDPG():
         self.memory = ReplayBuffer(self.buffer_size, self.batch_size)
 
         # Algorithm parameters
-        self.gamma = 0.995  # discount factor
+        self.gamma = 0.99  # discount factor
         self.tau = 0.001  # for soft update of target parameters
-        self.score = -np.inf
+        self.score = 0
         self.best_score = -np.inf
 
     def reset_episode(self):
@@ -49,9 +49,15 @@ class DDPG():
         return state
 
     def step(self, action, reward, next_state, done):
-         # Save experience / reward
-        self.memory.add(self.last_state, action, reward, next_state, done)
+        
+        if done:
+            reward = self.eval_episode(reward)
 
+        self.add_score(reward)
+        
+        # Save experience / reward
+        self.memory.add(self.last_state, action, reward, next_state, done)
+        
         # Learn, if enough samples are available in memory
         if len(self.memory) > self.batch_size:
             experiences = self.memory.sample()
@@ -59,6 +65,35 @@ class DDPG():
 
         # Roll over last state and action
         self.last_state = next_state
+        
+    def add_score(self, reward):
+        self.score += reward
+        if self.best_score < self.score:
+            self.best_score = self.score
+            
+    def reset_score(self):
+        self.score = 0
+       
+    def eval_episode(self, episode_reward):
+        x = self.task.sim.pose[0]
+        y = self.task.sim.pose[1]
+        z = self.task.sim.pose[2]
+        
+        if z <= 0 or z >= 20:
+            episode_reward -= 10
+        elif (z >= 8 and z <= 12) and (x >= -3 and x <= 3) and (y >= -3 and y <= 3):
+            episode_reward += 20
+#         error = abs(self.task.sim.pose[:3] - self.task.target_pos)
+#         if (error < 2).all():
+#             print("good error")
+#             print(self.task.sim.pose[:3])
+#             print(error)
+#             episode_reward += 50
+#         elif (self.task.sim.pose[2] > 0 and self.task.sim.pose[2] < 15):
+#             print("good pose")
+#             print(self.task.sim.pose[:3])
+#             episode_reward += 15
+        return episode_reward
 
     def act(self, state):
         """Returns actions for given state(s) as per current policy."""
@@ -79,11 +114,6 @@ class DDPG():
         #     Q_targets_next = critic_target(next_state, actor_target(next_state))
         actions_next = self.actor_target.model.predict_on_batch(next_states)
         Q_targets_next = self.critic_target.model.predict_on_batch([next_states, actions_next])
-        
-        # compute average score
-        self.score = np.mean(rewards)
-        if self.score > self.best_score:
-            self.best_score = self.score
         
         # Compute Q targets for current states and train critic model (local)
         Q_targets = rewards + self.gamma * Q_targets_next * (1 - dones)

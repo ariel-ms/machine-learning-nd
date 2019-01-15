@@ -38,9 +38,8 @@ name 'np' is not defined
         # Combine state and action pathways
         net = layers.Add()([net_states, net_actions])
         net = layers.Activation('relu')(net)
-        net = layers.BatchNormalization()(net)
         # Add more layers to the combined network if needed
-
+        
         # Add final output layer to prduce action values (Q values)
         Q_values = layers.Dense(units=1, name='q_values')(net)
 
