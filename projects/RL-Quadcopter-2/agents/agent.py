@@ -73,26 +73,24 @@ class DDPG():
             
     def reset_score(self):
         self.score = 0
+        
+    def acceptable_episode(self):
+        #print(self.task.sim.pose[:3] - self.task.target_pos)
+        print(np.linalg.norm(self.task.sim.pose[:3]-self.task.target_pos))
        
     def eval_episode(self, episode_reward):
         x = self.task.sim.pose[0]
         y = self.task.sim.pose[1]
         z = self.task.sim.pose[2]
+        if z <= 0:
+            episode_reward -= 35
+        elif z >= 145:
+            episode_reward -= 25
         
-        if z <= 0 or z >= 20:
-            episode_reward -= 10
-        elif (z >= 8 and z <= 12) and (x >= -3 and x <= 3) and (y >= -3 and y <= 3):
-            episode_reward += 20
-#         error = abs(self.task.sim.pose[:3] - self.task.target_pos)
-#         if (error < 2).all():
-#             print("good error")
-#             print(self.task.sim.pose[:3])
-#             print(error)
-#             episode_reward += 50
-#         elif (self.task.sim.pose[2] > 0 and self.task.sim.pose[2] < 15):
-#             print("good pose")
-#             print(self.task.sim.pose[:3])
-#             episode_reward += 15
+        if (z >= 90 and z <= 110) and (x >= -20 and x <= 20) and (y >= -20 and y <= 20):
+            episode_reward += 40
+        elif (z >= 65 and z < 130) and (x >= -50 and x <= 50) and (y >= -50 and y <= 50):
+            episode_reward += 50
         return episode_reward
 
     def act(self, state):

@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from physics_sim import PhysicsSim
 
 class Task():
@@ -22,16 +23,27 @@ class Task():
         self.action_low = 0
         self.action_high = 900
         self.action_size = 4
+        self.origin = np.array([0., 0., 0.])
 
         # Goal
         self.target_pos = target_pos if target_pos is not None else np.array([0., 0., 10.]) 
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
-#         error = abs(self.sim.pose[:3] - self.target_pos)
-#         reward = 1.-.3*(error).sum()
-        reward = np.linalg.norm(np.tanh(self.sim.pose[:3]-self.target_pos))
-        return reward
+        x = self.sim.pose[0]
+        y = self.sim.pose[1]
+        z_target = self.target_pos[2]
+        z = self.sim.pose[2]
+        
+        if z <= z_target:
+            reward = np.linalg.norm(np.tanh(self.sim.pose[2]-0))
+        elif z > z_target:
+            reward = 1 - (np.linalg.norm(np.tanh(self.sim.pose[2]-self.target_pos[2]))*1.7)
+            
+        reward += 1 - (np.linalg.norm(np.tanh(self.target_pos[:2]-self.sim.pose[:2]*1))*1.5)
+#         if (x >= 70 or x <= -70) or (y >= 70 or y <= -70):
+#             reward += -0.3
+        return -0.75 if z <= 0 or z >= 300 else reward
                 
     def print_position(self):
         print(self.sim.pose[:3])
