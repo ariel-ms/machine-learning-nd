@@ -36,15 +36,25 @@ class Task():
         z = self.sim.pose[2]
         
         if z <= z_target:
-            reward = np.linalg.norm(np.tanh(self.sim.pose[2]-0))
+            reward = ((-((z/10)-10)**2) + 100) / z_target
         elif z > z_target:
-            reward = 1 - (np.linalg.norm(np.tanh(self.sim.pose[2]-self.target_pos[2]))*1.7)
-            
-        reward += 1 - (np.linalg.norm(np.tanh(self.target_pos[:2]-self.sim.pose[:2]*1))*1.5)
-#         if (x >= 70 or x <= -70) or (y >= 70 or y <= -70):
-#             reward += -0.3
-        return -0.75 if z <= 0 or z >= 300 else reward
-                
+#             reward = (100 - (z - z_target))/100
+            z = 200 if z > 200 else z
+            x = (z - z_target) / 100
+            reward = (x - 1)**2
+        
+#         print("x and y and z" + str(x) + " " + str(y) +" " + str(z))
+#         print("before " + str(reward))
+#         penalty = self.gaussian_func(1, x, y, 0, 0, 20, 20)
+#         print("penalty" + str(penalty))
+#         reward -=  (1 - penalty)
+        reward += 1 - (np.linalg.norm(np.tanh(self.target_pos[:2]-self.sim.pose[:2]))*1.1)
+#         print("after " + str(reward))
+        return -0.8 if z <= 0 or z >= 300 else reward
+    
+    def gaussian_func(self, A, x, y, x0, y0, sigx, sigy):
+        return A*np.exp(-1*(((x - x0)**2/(2*(sigx**2))) + ((y - y0)**2/(2*(sigy)**2))))
+    
     def print_position(self):
         print(self.sim.pose[:3])
         
