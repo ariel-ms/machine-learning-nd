@@ -33,8 +33,6 @@ name 'np' is not defined
         net_actions = layers.Dense(units=400, activation='relu')(actions)
         net_actions = layers.Dense(units=300, activation='relu')(net_actions)
 
-        # Try different layer sizes, activations, add batch normalization, regularizers, etc.
-
         # Combine state and action pathways
         net = layers.Add()([net_states, net_actions])
         net = layers.Activation('relu')(net)

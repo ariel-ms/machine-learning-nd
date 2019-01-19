@@ -34,7 +34,6 @@ class Actor:
         net = layers.Dense(units=400, activation='relu')(states)
         net = layers.Dense(units=300, activation='relu')(net)
         net = layers.BatchNormalization()(net)
-        # Try different layer sizes, activations, add batch normalization, regularizers, etc.
 
         # Add final output layer with sigmoid activation
         raw_actions = layers.Dense(units=self.action_size, activation='tanh',
