@@ -19,23 +19,23 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings("ignore")
 
-train = pd.read_csv("../input/train/train.csv")
-test = pd.read_csv("../input/test/test.csv")
+train = pd.read_csv("./train/train.csv")
+test = pd.read_csv("./test/test.csv")
 petID = np.asarray(test.PetID)
 
 # Get the breeds dictionary
-breeds = pd.read_csv('../input/breed_labels.csv')
+breeds = pd.read_csv('./breed_labels.csv')
 breeds_dict = breeds.to_dict()["BreedName"]
 
 # Add key 307 to value Mixed Breed - preprocessing step
 breeds_dict[307] = 'Mixed Breed'
 
 # Get colors dataframe and translate it into a dictionary
-colors = pd.read_csv("../input/color_labels.csv")
+colors = pd.read_csv("./color_labels.csv")
 colors_dict = colors.to_dict()["ColorName"]
 
 #Get state dictionary
-states = pd.read_csv("../input/state_labels.csv")
+states = pd.read_csv("./state_labels.csv")
 states_dictionary = states.to_dict()
 states_dict = {value:states_dictionary["StateName"][key] for key, value in states_dictionary["StateID"].items()}
 
@@ -44,26 +44,25 @@ continous_variables = ["Age", "Quantity", "PhotoAmt", "Fee"]
 categorical_variables = ["Type", "Breed1", "Breed2", "Gender", "Color1", "Color2", "Color3",\
                          "MaturitySize", "FurLength", "Vaccinated", "Dewormed", "Sterilized",\
                          "Health", "AdoptionSpeed", "State", 'RescuerID']
-                        
+
 # # load json data
 import json
 from pprint import pprint
 
 # returns the sentiment score from the metadata files
 def get_sentiment_dict(directory_str):
-    
     directory = os.fsencode(directory_str)
     sentiment_dict = {}
     
     for file in os.listdir(directory):
         filename = os.fsdecode(file)
-        with open(directory_str + '/' + filename) as json_file:
+        with open(directory_str + '/' + filename, encoding='utf8') as json_file:
             data = json.load(json_file)
             sentiment_dict[filename[:filename.index(".json")]] = data['documentSentiment']["score"]
     return sentiment_dict
 
-sentiment_dict_train = get_sentiment_dict('../input/train_sentiment')
-sentiment_dict_test = get_sentiment_dict('../input/test_sentiment')
+sentiment_dict_train = get_sentiment_dict('./train_sentiment')
+sentiment_dict_test = get_sentiment_dict('./test_sentiment')
 
 # add sentiment score to train sets
 train['SentimentScore'] = train['PetID'].map(sentiment_dict_train)
