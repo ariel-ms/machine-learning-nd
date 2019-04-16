@@ -19,23 +19,33 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings("ignore")
 
-train = pd.read_csv("./train/train.csv")
-test = pd.read_csv("./test/test.csv")
+train = pd.read_csv("../input/train/train.csv")
+test = pd.read_csv("../input/test/test.csv")
 petID = np.asarray(test.PetID)
 
+# Print number of nan values
+# print(train.isnull().sum().sum())
+# print(test.isnull().sum().sum())
+
+# for var in list(train):
+#     print(var + ": " + str(train[[var]].isnull().sum()))
+
+# for var in list(test):
+    # print(var + ": " + str(test[[var]].isnull().sum()))
+
 # Get the breeds dictionary
-breeds = pd.read_csv('./breed_labels.csv')
+breeds = pd.read_csv('../input/breed_labels.csv')
 breeds_dict = breeds.to_dict()["BreedName"]
 
 # Add key 307 to value Mixed Breed - preprocessing step
 breeds_dict[307] = 'Mixed Breed'
 
 # Get colors dataframe and translate it into a dictionary
-colors = pd.read_csv("./color_labels.csv")
+colors = pd.read_csv("../input/color_labels.csv")
 colors_dict = colors.to_dict()["ColorName"]
 
 #Get state dictionary
-states = pd.read_csv("./state_labels.csv")
+states = pd.read_csv("../input/state_labels.csv")
 states_dictionary = states.to_dict()
 states_dict = {value:states_dictionary["StateName"][key] for key, value in states_dictionary["StateID"].items()}
 
@@ -51,24 +61,90 @@ from pprint import pprint
 
 # returns the sentiment score from the metadata files
 def get_sentiment_dict(directory_str):
+    
     directory = os.fsencode(directory_str)
     sentiment_dict = {}
     
     for file in os.listdir(directory):
         filename = os.fsdecode(file)
-        with open(directory_str + '/' + filename, encoding='utf8') as json_file:
+        with open(directory_str + '/' + filename) as json_file:
             data = json.load(json_file)
             sentiment_dict[filename[:filename.index(".json")]] = data['documentSentiment']["score"]
     return sentiment_dict
 
-sentiment_dict_train = get_sentiment_dict('./train_sentiment')
-sentiment_dict_test = get_sentiment_dict('./test_sentiment')
+sentiment_dict_train = get_sentiment_dict('../input/train_sentiment')
+sentiment_dict_test = get_sentiment_dict('../input/test_sentiment')
 
-# add sentiment score to train sets
+# Add sentiment score to train sets
 train['SentimentScore'] = train['PetID'].map(sentiment_dict_train)
 test['SentimentScore'] = test['PetID'].map(sentiment_dict_test)
 
+### DATA PREPROCESSING FOR VISUALIZATION ###
+continous_dataframe = train[continous_variables]
+categorical_dataframe = train[categorical_variables]
+
+# map colors to their respective string
+categorical_dataframe['Color1'] = categorical_dataframe['Color1'].map({0: 'Black', 1: 'Brown', 2: 'Golden', 3: 'Yellow', 4: 'Cream', 5: 'Gray', 6: 'White', 7: 'Brown'})
+categorical_dataframe['Color2'] = categorical_dataframe['Color2'].map({0: 'Black', 1: 'Brown', 2: 'Golden', 3: 'Yellow', 4: 'Cream', 5: 'Gray', 6: 'White', 7: 'Black'})
+categorical_dataframe['Color3'] = categorical_dataframe['Color3'].map({0: 'Black', 1: 'Brown', 2: 'Golden', 3: 'Yellow', 4: 'Cream', 5: 'Gray', 6: 'White', 7: 'Black'})
+
+# map categorical breeds id to their respective name 
+categorical_dataframe['Breed1'] =  categorical_dataframe['Breed1'].map(breeds_dict)
+categorical_dataframe['Breed2'] =  categorical_dataframe['Breed2'].map(breeds_dict)
+
+# map state key to their respective key
+categorical_dataframe['State'] = categorical_dataframe['State'].map(states_dict)
+
+# join continous and categorical dataframe into one
+join_dataframe = continous_dataframe.join(categorical_dataframe).join(train['PetID'])
+
+# add sentiment score to join dataframe
+join_dataframe['SentimentScore'] = join_dataframe['PetID'].map(sentiment_dict_train)
+
+# add sentiment score to continous dataframe
+continous_dataframe['SentimentScore'] = join_dataframe['SentimentScore']
+
+# plot pair plot of continous data frame
+# sns.pairplot(continous_dataframe.join(train['AdoptionSpeed']), vars=["Age", "PhotoAmt", "SentimentScore", "Fee"], hue="AdoptionSpeed")
+
+# Print boxplots of continous variables by AdoptionSpeed
+# for col in list(continous_dataframe):
+#     join_dataframe.boxplot(column=[col], by='AdoptionSpeed')
+
+# Print distribution plots of continous variables
+# y_vars = list(continous_dataframe)
+
+# def plot_pdf(fig_size, x_var, y_vars, data, font_size = 30):
+#     for i in range(fig_size[1]):
+#         g = sns.FacetGrid(data, hue="AdoptionSpeed", height=5) \
+#           .map(sns.distplot, y_vars[i], ) \
+#           .add_legend()
+#         g.fig.suptitle("Distribution plot of " + str(y_vars[i]), size = "13")
+#     plt.show()
+
+# plot_pdf((1, len(y_vars)), "AdoptionSpeed", y_vars, join_dataframe)
+
+# Plot violin plots
+# for col in list(continous_dataframe):
+#     sns.violinplot(x = "AdoptionSpeed", y = col, data = join_dataframe)
+#     plt.show()
+
+
+# Plot categorical variable histograms
+# categorical_dataframe['Type'].value_counts().plot(kind='bar', title = "Type of animal (1 = Dog, 2 = Cat)", grid = True)
+# join_dataframe.boxplot(column = ['Age'], by='AdoptionSpeed')
+
+# for categorical in categorical_dataframe:
+#     if (categorical != "Breed1" and categorical != "Breed2" and categorical != "RescuerID"):
+#         ax = categorical_dataframe[categorical].value_counts().plot(kind='barh', title = categorical, grid = True)
+#         for i, v in enumerate(categorical_dataframe[categorical].value_counts()):
+#             ax.text(v + 5, i, str(v), fontweight='bold')
+#         plt.show()
+
+### DATA PREPROCESSING FOR MODELING ###
 X = pd.concat([train, test], ignore_index = True, sort = False)
+
+print(X.isnull().sum().sum())
 
 # Normalize
 X[continous_variables] = X[continous_variables] = (X[continous_variables] - X[continous_variables].min()) / (X[continous_variables].max() - X[continous_variables].min())
@@ -230,82 +306,3 @@ df.to_csv('submission.csv', index = False)
 
 # op=pd.DataFrame(data={'PassengerId':test['PassengerId'],'Survived':model.predict(testdf)})
 # op.to_csv('KFold_XGB_GridSearchCV_submission.csv',index=False)
-
-# -----------------------------------------------------------------------
-
-# X_train = train.drop(vars_to_drop, axis = 1)
-# X_test = test.drop(vars_to_drop, axis = 1)
-
-# X_train.info()
-# ## remember to encode the colors and the states
-
-# # remove description and name column 
-# train = train.drop('Description', axis = 1)
-# train = train.drop('Name',  axis = 1)
-# test = test.drop('Description',  axis = 1)
-# test = test.drop('Name',  axis = 1)
-
-
-# # types dictionary
-# def type_dict(df):
-#     df = df.columns.to_series().groupby(train.dtypes).groups
-#     return {k.name : v.get_values().tolist() for k, v in df.items()}
-
-# train_types_dict = type_dict(train)
-# test_types_dict = type_dict(test)
-
-# # print(train_types_dict['object'])
-
-# # encode (check if necessary for nominal and ordinal numerical variables)
-# # train = pd.get_dummies(train, prefix=train_types_dict['object'])
-# # test = pd.get_dummies(test, prefix=test_types_dict['object'])
-
-# # normalize
-# train[continous_variables] = (train[continous_variables] - train[continous_variables].min()) / (train[continous_variables].max() - train[continous_variables].min())
-# test[continous_variables] = (test[continous_variables] - test[continous_variables].min()) / (test[continous_variables].max() - test[continous_variables].min())
-
-# # standarize
-# train[continous_variables] = (train[continous_variables] - train[continous_variables].mean()) / train[continous_variables].std()
-# test[continous_variables] = (test[continous_variables] - test[continous_variables].mean()) / test[continous_variables].std()
-
-# # remove NANs from train and test sets
-# train['SentimentScore'].fillna(0, inplace=True)
-# test['SentimentScore'].fillna(0, inplace=True)
-
-# # remove recueid and petid
-# train.info()
-
-# # remove prediction varaible from train dataframe
-# # y = train['AdoptionSpeed']
-# # train = train.drop('AdoptionSpeed', axis = 1)
-
-# # xgboost
-# import xgboost as xgb
-# from sklearn.model_selection import StratifiedKFold
-
-# xgb_params = {
-#     'eval_metric': 'rmse',
-#     'seed': 1337,
-#     'silent': 1,
-# }
-
-# def run_model(train, test, params):
-#     kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-#     for train_idx, valid_idx in kf.split(train, train.)
-# # from sklearn.cross_validation import train_test_split
-# # X_train, X_test, y_train, y_test = train_test_split(train, y, test_size=0.2, random_state=42)
-
-# dtrain = xgb.DMatrix(X_train, label=y_train)
-# dtest = xgb.DMatrix(X_test, label=y_test)
-
-# param = {
-#     'max_depth': 3,  # the maximum depth of each tree
-#     'eta': 0.3,  # the training step for each iteration
-#     'silent': 1,  # logging mode - quiet
-#     'objective': 'multi:softprob',  # error evaluation for multiclass training
-#     'num_class': 3}  # the number of classes that exist in this datset
-# num_round = 20
-
-# # predict
-
-# # submit
