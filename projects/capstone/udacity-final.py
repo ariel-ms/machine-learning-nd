@@ -79,6 +79,7 @@ sentiment_dict_test = get_sentiment_dict('../input/test_sentiment')
 train['SentimentScore'] = train['PetID'].map(sentiment_dict_train)
 test['SentimentScore'] = test['PetID'].map(sentiment_dict_test)
 
+
 ### DATA PREPROCESSING FOR VISUALIZATION ###
 continous_dataframe = train[continous_variables]
 categorical_dataframe = train[categorical_variables]
@@ -144,7 +145,9 @@ continous_dataframe['SentimentScore'] = join_dataframe['SentimentScore']
 ### DATA PREPROCESSING FOR MODELING ###
 X = pd.concat([train, test], ignore_index = True, sort = False)
 
-print(X.isnull().sum().sum())
+# print(X.isnull().sum().sum())
+# for var in list(train):
+#     print(var + ": " + str(train[[var]].isnull().sum()))
 
 # Normalize
 X[continous_variables] = X[continous_variables] = (X[continous_variables] - X[continous_variables].min()) / (X[continous_variables].max() - X[continous_variables].min())
@@ -213,38 +216,55 @@ assert X_test.shape[0] == test.shape[0]
 
 from sklearn.model_selection import StratifiedKFold
 
-# Train xgboost
+# # Train xgboost
 # import xgboost as xgb
 # def train_XGBoost(train, test, params):
 #     kfolds = 10
 #     folds = StratifiedKFold(n_splits = kfolds, shuffle = True, random_state = 42)
 #     output_df = np.zeros((test.shape[0], kfolds))
 #     col = 0
-    
+#     # train kfold models based on the splits from StratifiedKFold
 #     for train_index, val_index in folds.split(train, train['AdoptionSpeed'].values):
+#         # Obtain from training data a train and validation sets
 #         X_train = train.iloc[train_index, :] 
 #         X_val = train.iloc[val_index, :]
         
+#         # Separate target variable from training set
 #         y_train = X_train['AdoptionSpeed'].values
 #         y_val = X_val['AdoptionSpeed'].values
         
+#         # Separate target variable from validation set
 #         X_train = X_train.drop(['AdoptionSpeed'], axis = 1)
 #         X_val = X_val.drop(['AdoptionSpeed'], axis = 1)
         
+#         # Transform training/validation data into DMatrix format
 #         dm_train = xgb.DMatrix(data = X_train, label = y_train, feature_names = X_train.columns)
 #         dm_val = xgb.DMatrix(data = X_val, label = y_val, feature_names = X_test.columns)
         
 #         watchlist = [(dm_train, 'train'), (dm_val, 'validation')]
         
-#         model = xgb.train(dtrain=dm_train, num_boost_round=30000, evals = watchlist, \
-#                          early_stopping_rounds=500, verbose_eval=1000, params=params)
+#         model = xgb.train(dtrain=dm_train, evals = watchlist, num_boost_round = 100, verbose_eval=1000, params=params)
         
-#         predictions_test = model.predict(xgb.DMatrix(test, feature_names=test.columns), ntree_limit = model.best_ntree_limit)
+#         predictions_test = model.predict(xgb.DMatrix(test, feature_names=test.columns))
 #         output_df[:, col] = predictions_test
 #         col += 1
 #     return model, output_df
 
-# params = { 'eval_metric': 'rmse', 'seed': 42, 'silent': 1}
+## model = xgb.train(dtrain=dm_train, num_boost_round=30000, evals = watchlist, \
+##                          early_stopping_rounds=500, verbose_eval=1000, params=params)
+
+## predictions_test = model.predict(xgb.DMatrix(test, feature_names=test.columns), ntree_limit = model.best_ntree_limit)
+
+# # params = { 'eval_metric': 'rmse', 'seed': 42, 'silent': 1}
+# params = { 'eval_metric': 'merror',
+#             'eta': 0.01,
+#             'max_depth': 3,
+#             'subsample': 0.8,
+#             'colsample_bytree': 1,
+#             'gamma': 0,
+#             'objective': 'multi:softmax',
+#             'num_class': 5}
+
 # model, output = train_XGBoost(X_train, X_test, params)
 # output = output.mean(axis=1)
 
@@ -272,32 +292,70 @@ def train_LGBM(train, test, params):
         d_valid = lgb.Dataset(X_val, label=y_val)
         
         watchlist = [d_train, d_valid]
+        
         model = lgb.train(params,
                           train_set=d_train,
                           valid_sets=watchlist,
-                          verbose_eval=params['verbose_eval'],
-                          early_stopping_rounds=100)
-        predictions_test = model.predict(test, num_iteration=model.best_iteration)
-        output_df[:, col] = predictions_test
+                          verbose_eval=50)
+                          
+        predictions_test = model.predict(test)
+        # print(predictions_test)
+        output_df[:, col] = np.argmax(predictions_test, axis=1)
         col += 1
     return model, output_df
     
-params = {
-    'application': 'regression',
-    'mertic': 'rmse',
-    'metric': 'auc',
-    'boosting': 'gbdt',
-    'num_leaves': 50,
-    'feature_fraction': 0.5,
-    'bagging_fraction': 0.5,
-    'bagging_freq': 20,
-    'learning_rate': 0.05,
-    'verbose_eval': 50
-}
+# params = {
+#     'application': 'regression',
+#     'mertic': 'rmse',
+#     'metric': 'auc',
+#     'boosting': 'gbdt',
+#     'num_leaves': 50,
+#     'feature_fraction': 0.5,
+#     'bagging_fraction': 0.5,
+#     'bagging_freq': 20,
+#     'learning_rate': 0.05,
+#     'verbose_eval': 50
+# }
 
+params = {'min_data_in_leaf': 100,
+        'application': 'multiclass',
+        'num_class': 5,
+        'metric': 'softmax',
+        'learning_rate': 0.1,
+        'num_leaves': 100}
+        
 model, output = train_LGBM(X_train, X_test, params)
 output = output.mean(axis=1)
 
+# Train random forest algorithm
+
+# from sklearn.ensemble import RandomForestRegressor
+# from sklearn.model_selection import RandomizedSearchCV
+
+# random_grid = { 'n_estimators': [100, 250, 500, 750, 1000, 1500, 1750, 2000],
+#                 'max_features': ['auto', 'sqrt', 'log2'],
+#                 'min_samples_leaf': [1,2,3,4,5,6], 
+#                 'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None]}
+                
+# model = RandomForestRegressor()
+# model_random = RandomizedSearchCV(estimator = model, param_distributions = random_grid, n_iter = 10, verbose = 1, n_jobs = -1)
+# model_random.fit(X_train.drop('AdoptionSpeed', axis=1), X_train['AdoptionSpeed'])
+# best_random_model = model_random.best_estimator_
+# output = best_random_model.predict(X_test)
+
+# from sklearn.model_selection import GridSearchCV
+
+# param_grid = {'n_estimators': [1500, 1750, 2000, 2250, 2500],
+#             'min_samples_leaf': [3, 4, 5],
+#             'max_depth': [60,70, 80, 90, 100]}
+
+# model = RandomForestRegressor()
+# grid_search = GridSearchCV(estimator = model, param_grid = param_grid, cv = 2, n_jobs = -1, verbose = 1)
+# grid_search.fit(X_train.drop('AdoptionSpeed', axis=1), X_train['AdoptionSpeed'])
+# best_estimator = grid_search.best_estimator_
+# output = best_estimator.predict(X_test)
+
+# Final data frame construction
 df = pd.DataFrame(data = {'PetID': petID, 'AdoptionSpeed': output})
 df.AdoptionSpeed = df.AdoptionSpeed.astype('int32')
 
@@ -306,3 +364,82 @@ df.to_csv('submission.csv', index = False)
 
 # op=pd.DataFrame(data={'PassengerId':test['PassengerId'],'Survived':model.predict(testdf)})
 # op.to_csv('KFold_XGB_GridSearchCV_submission.csv',index=False)
+
+# -----------------------------------------------------------------------
+
+# X_train = train.drop(vars_to_drop, axis = 1)
+# X_test = test.drop(vars_to_drop, axis = 1)
+
+# X_train.info()
+# ## remember to encode the colors and the states
+
+# # remove description and name column 
+# train = train.drop('Description', axis = 1)
+# train = train.drop('Name',  axis = 1)
+# test = test.drop('Description',  axis = 1)
+# test = test.drop('Name',  axis = 1)
+
+
+# # types dictionary
+# def type_dict(df):
+#     df = df.columns.to_series().groupby(train.dtypes).groups
+#     return {k.name : v.get_values().tolist() for k, v in df.items()}
+
+# train_types_dict = type_dict(train)
+# test_types_dict = type_dict(test)
+
+# # print(train_types_dict['object'])
+
+# # encode (check if necessary for nominal and ordinal numerical variables)
+# # train = pd.get_dummies(train, prefix=train_types_dict['object'])
+# # test = pd.get_dummies(test, prefix=test_types_dict['object'])
+
+# # normalize
+# train[continous_variables] = (train[continous_variables] - train[continous_variables].min()) / (train[continous_variables].max() - train[continous_variables].min())
+# test[continous_variables] = (test[continous_variables] - test[continous_variables].min()) / (test[continous_variables].max() - test[continous_variables].min())
+
+# # standarize
+# train[continous_variables] = (train[continous_variables] - train[continous_variables].mean()) / train[continous_variables].std()
+# test[continous_variables] = (test[continous_variables] - test[continous_variables].mean()) / test[continous_variables].std()
+
+# # remove NANs from train and test sets
+# train['SentimentScore'].fillna(0, inplace=True)
+# test['SentimentScore'].fillna(0, inplace=True)
+
+# # remove recueid and petid
+# train.info()
+
+# # remove prediction varaible from train dataframe
+# # y = train['AdoptionSpeed']
+# # train = train.drop('AdoptionSpeed', axis = 1)
+
+# # xgboost
+# import xgboost as xgb
+# from sklearn.model_selection import StratifiedKFold
+
+# xgb_params = {
+#     'eval_metric': 'rmse',
+#     'seed': 1337,
+#     'silent': 1,
+# }
+
+# def run_model(train, test, params):
+#     kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+#     for train_idx, valid_idx in kf.split(train, train.)
+# # from sklearn.cross_validation import train_test_split
+# # X_train, X_test, y_train, y_test = train_test_split(train, y, test_size=0.2, random_state=42)
+
+# dtrain = xgb.DMatrix(X_train, label=y_train)
+# dtest = xgb.DMatrix(X_test, label=y_test)
+
+# param = {
+#     'max_depth': 3,  # the maximum depth of each tree
+#     'eta': 0.3,  # the training step for each iteration
+#     'silent': 1,  # logging mode - quiet
+#     'objective': 'multi:softprob',  # error evaluation for multiclass training
+#     'num_class': 3}  # the number of classes that exist in this datset
+# num_round = 20
+
+# # predict
+
+# # submit
